@@ -123,16 +123,21 @@ void UI_DisplayLock(void)
 							gUpdateDisplay = true;
 							break;
 
+						case KEY_SIDE1:
+						case KEY_SIDE2:
 						case KEY_EXIT:
 							if (gInputBoxIndex > 0)
 							{
 								gInputBox[--gInputBoxIndex] = 10;
 								gUpdateDisplay = true;
+								AUDIO_PlayBeep(BEEP_1KHZ_60MS_OPTIONAL);
+								break;
 							}
-
-							AUDIO_PlayBeep(BEEP_1KHZ_60MS_OPTIONAL);
+							AUDIO_PlayBeep(BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL);
+							break;
 
 						default:
+							AUDIO_PlayBeep(BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL);
 							break;
 					}
 				}
