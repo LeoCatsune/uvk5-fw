@@ -17,6 +17,16 @@
 #ifndef VERSION_H
 #define VERSION_H
 
+#ifndef AUTHOR_STRING
+    #define AUTHOR_STRING "EGZUMER"
+#endif
+
+#ifdef VERSION_STRING
+	#define VER     " "VERSION_STRING
+#else
+	#define VER     ""
+#endif
+
 extern const char Version[];
 extern const char UART_Version[];
 
