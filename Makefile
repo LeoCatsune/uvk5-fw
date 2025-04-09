@@ -12,14 +12,14 @@ ENABLE_VOICE                  ?= 0
 ENABLE_VOX                    ?= 1
 ENABLE_ALARM                  ?= 0
 ENABLE_TX1750                 ?= 0
-ENABLE_PWRON_PASSWORD         ?= 0
+ENABLE_PWRON_PASSWORD         ?= 1
 ENABLE_DTMF_CALLING           ?= 1
 ENABLE_FLASHLIGHT             ?= 1
 
 # ---- CUSTOM MODS ----
 ENABLE_BIG_FREQ               ?= 1
 ENABLE_SMALL_BOLD             ?= 1
-ENABLE_CUSTOM_MENU_LAYOUT     ?= 1
+ENABLE_CUSTOM_MENU_LAYOUT     ?= 0
 ENABLE_KEEP_MEM_NAME          ?= 1
 ENABLE_WIDE_RX                ?= 1
 ENABLE_TX_WHEN_AM             ?= 0
@@ -27,7 +27,7 @@ ENABLE_F_CAL_MENU             ?= 0
 ENABLE_CTCSS_TAIL_PHASE_SHIFT ?= 0
 ENABLE_BOOT_BEEPS             ?= 0
 ENABLE_SHOW_CHARGE_LEVEL      ?= 0
-ENABLE_REVERSE_BAT_SYMBOL     ?= 0
+ENABLE_REVERSE_BAT_SYMBOL     ?= 1
 ENABLE_NO_CODE_SCAN_TIMEOUT   ?= 1
 ENABLE_AM_FIX                 ?= 1
 ENABLE_SQUELCH_MORE_SENSITIVE ?= 1
