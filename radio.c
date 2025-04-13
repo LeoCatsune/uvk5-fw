@@ -36,6 +36,7 @@
 #include "radio.h"
 #include "settings.h"
 #include "ui/menu.h"
+#include "app/txlock.h"
 
 VFO_Info_t    *gTxVfo;
 VFO_Info_t    *gRxVfo;
@@ -944,6 +945,12 @@ void RADIO_PrepareTX(void)
 #ifndef ENABLE_TX_WHEN_AM
 	else if (gCurrentVfo->Modulation != MODULATION_FM) {
 		// not allowed to TX if in AM mode
+		State = VFO_STATE_TX_DISABLE;
+	}
+#endif
+#ifdef ENABLE_TX_LOCK
+	else if (gTxLockEnable) {
+		// TX Lock enabled, disallow TX
 		State = VFO_STATE_TX_DISABLE;
 	}
 #endif
