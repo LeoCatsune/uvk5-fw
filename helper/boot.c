@@ -30,6 +30,7 @@
 #include "settings.h"
 #include "ui/menu.h"
 #include "ui/ui.h"
+#include "app/txlock.h"
 
 BOOT_Mode_t BOOT_GetMode(void)
 {
@@ -53,6 +54,13 @@ BOOT_Mode_t BOOT_GetMode(void)
 
 		if (Keys[0] == KEY_SIDE1)
 			return BOOT_MODE_F_LOCK;
+
+		#ifdef ENABLE_TX_LOCK
+			if (Keys[0] == KEY_MENU) {
+				gTxLockEnable = false;
+				return BOOT_MODE_NORMAL;
+			}
+		#endif
 
 		#ifdef ENABLE_AIRCOPY
 			if (Keys[0] == KEY_SIDE2)
