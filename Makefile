@@ -162,6 +162,8 @@ OBJS += scheduler.o
 OBJS += settings.o
 # CUSTOM: UHF-CB
 OBJS += uhfcb.o
+OBJS += app/uhfcb.o
+OBJS += ui/uhfcb.o
 # END CUSTOM
 ifeq ($(ENABLE_AIRCOPY),1)
 	OBJS += ui/aircopy.o

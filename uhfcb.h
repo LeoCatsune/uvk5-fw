@@ -16,7 +16,9 @@ typedef struct {
   const uint8_t info;
 } uhfcb_chan_t;
 
-static uint32_t uhfcb_freq_hz(uint8_t slot);
-static const char *uhfcb_flags_name(uint8_t flags);
+extern const uhfcb_chan_t uhfcbChanList[];
+
+uint32_t uhfcb_freq_hz(uint8_t slot);
+const char *uhfcb_flags_name(uint8_t flags);
 
 #endif

@@ -108,12 +108,16 @@ const uhfcb_chan_t uhfcbChanList[] = {
 static_assert(UHFCB_NUM_CHANNELS == 80,
               "Channel table must contain exactly 80 entries");
 
-static inline uint32_t uhfcb_freq_hz(uint8_t slot) {
+inline uint32_t uhfcb_freq_hz(uint8_t slot) {
   if (slot >= 80)
     slot = 0;
   return UHFCB_BASE_HZ + (uint32_t)slot * UHFCB_STEP_HZ;
 }
 
-static inline const char *uhfcb_flags_name(uint8_t flags) {
+inline const char *uhfcb_flags_name(uint8_t flags) {
+  if (flags & UHFCB_FLAG_DATA)
+    return "DATA";
+  if (flags & UHFCB_FLAG_RESERVED)
+    return "RESV";
   return uhfcbNameList[flags & UHFCB_MASK_NAMEID];
 }
