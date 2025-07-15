@@ -1,0 +1,375 @@
+diff --git a/app/uhfcb.c b/app/uhfcb.c
+index ef609a1..5549a15 100644
+--- a/app/uhfcb.c
++++ b/app/uhfcb.c
+@@ -1,4 +1,5 @@
+ #include "uhfcb.h"
++#include "audio.h"
+ #include <stdint.h>
+ 
+ uint8_t gUhfCurrChannel = 1;
+@@ -15,10 +16,12 @@ void UHF_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) {
+   case KEY_UP:
+     if (gUhfCurrChannel < 80)
+       gUhfCurrChannel++;
++    AUDIO_PlayBeep(BEEP_1KHZ_60MS_OPTIONAL);
+     break;
+   case KEY_DOWN:
+     if (gUhfCurrChannel > 1)
+       gUhfCurrChannel--;
++    AUDIO_PlayBeep(BEEP_1KHZ_60MS_OPTIONAL);
+     break;
+   default:
+     // do nothing.
+diff --git a/uhfcb.c b/uhfcb.c
+index 99be674..43c2ee6 100644
+--- a/uhfcb.c
++++ b/uhfcb.c
+@@ -1,119 +1,103 @@
+ #include "uhfcb.h"
++#include "dcs.h"
++#include "frequencies.h"
++#include "radio.h"
++#include "settings.h"
+ #include <string.h>
+ 
+-#define UHFCB_BASE_HZ 476425000
+-#define UHFCB_STEP_HZ 12500
+-
+-#define UHFCB_FLAG_RP_OUT 0x08
+-#define UHFCB_FLAG_RP_IN 0x10
+-#define UHFCB_FLAG_SOS 0x20
+-#define UHFCB_FLAG_DATA 0x40
+-#define UHFCB_FLAG_RESERVED 0x80
++const uint32_t uhfcbChanList[] = {
++    UHFCB_PACK_FLAGS(0, UHFCB_FLAG_RP_OUT),                      // 1
++    UHFCB_PACK_FLAGS(2, UHFCB_FLAG_RP_OUT),                      // 2
++    UHFCB_PACK_FLAGS(4, UHFCB_FLAG_RP_OUT),                      // 3
++    UHFCB_PACK_FLAGS(6, UHFCB_FLAG_RP_OUT),                      // 4
++    UHFCB_PACK_FLAGS(8, UHFCB_FLAG_RP_OUT | UHFCB_FLAG_SOS | 1), // 5 ("SOS")
++    UHFCB_PACK_FLAGS(10, UHFCB_FLAG_RP_OUT),                     // 6
++    UHFCB_PACK_FLAGS(12, UHFCB_FLAG_RP_OUT),                     // 7
++    UHFCB_PACK_FLAGS(14, UHFCB_FLAG_RP_OUT),                     // 8
++    UHFCB_PACK_FLAGS(16, 0),                                     // 9
++    UHFCB_PACK_FLAGS(18, 2),                // 10 ("CONVOY")
++    UHFCB_PACK_FLAGS(20, 3),                // 11 ("CALL")
++    UHFCB_PACK_FLAGS(22, 0),                // 12
++    UHFCB_PACK_FLAGS(24, 0),                // 13
++    UHFCB_PACK_FLAGS(26, 0),                // 14
++    UHFCB_PACK_FLAGS(28, 0),                // 15
++    UHFCB_PACK_FLAGS(30, 0),                // 16
++    UHFCB_PACK_FLAGS(32, 0),                // 17
++    UHFCB_PACK_FLAGS(34, 0),                // 18
++    UHFCB_PACK_FLAGS(36, 0),                // 19
++    UHFCB_PACK_FLAGS(38, 0),                // 20
++    UHFCB_PACK_FLAGS(40, 0),                // 21
++    UHFCB_PACK_FLAGS(42, UHFCB_FLAG_DATA),  // 22 (DATA1)
++    UHFCB_PACK_FLAGS(44, UHFCB_FLAG_DATA),  // 23 (DATA2)
++    UHFCB_PACK_FLAGS(46, 0),                // 24
++    UHFCB_PACK_FLAGS(48, 0),                // 25
++    UHFCB_PACK_FLAGS(50, 0),                // 26
++    UHFCB_PACK_FLAGS(52, 0),                // 27
++    UHFCB_PACK_FLAGS(54, 0),                // 28
++    UHFCB_PACK_FLAGS(56, 4),                // 29 ("HIWAY")
++    UHFCB_PACK_FLAGS(58, 5),                // 30 ("BCAST")
++    UHFCB_PACK_FLAGS(60, UHFCB_FLAG_RP_IN), // 31
++    UHFCB_PACK_FLAGS(62, UHFCB_FLAG_RP_IN), // 32
++    UHFCB_PACK_FLAGS(64, UHFCB_FLAG_RP_IN), // 33
++    UHFCB_PACK_FLAGS(66, UHFCB_FLAG_RP_IN), // 34
++    UHFCB_PACK_FLAGS(68, UHFCB_FLAG_RP_IN | UHFCB_FLAG_SOS | 1), // 35 (SOS)
++    UHFCB_PACK_FLAGS(70, UHFCB_FLAG_RP_IN),                      // 36
++    UHFCB_PACK_FLAGS(72, UHFCB_FLAG_RP_IN),                      // 37
++    UHFCB_PACK_FLAGS(74, UHFCB_FLAG_RP_IN),                      // 38
++    UHFCB_PACK_FLAGS(76, 0),                                     // 39
++    UHFCB_PACK_FLAGS(78, 6),                                     // 40 ("ROAD")
++    UHFCB_PACK_FLAGS(1, UHFCB_FLAG_RP_OUT),                      // 41
++    UHFCB_PACK_FLAGS(3, UHFCB_FLAG_RP_OUT),                      // 42
++    UHFCB_PACK_FLAGS(5, UHFCB_FLAG_RP_OUT),                      // 43
++    UHFCB_PACK_FLAGS(7, UHFCB_FLAG_RP_OUT),                      // 44
++    UHFCB_PACK_FLAGS(9, UHFCB_FLAG_RP_OUT),                      // 45
++    UHFCB_PACK_FLAGS(11, UHFCB_FLAG_RP_OUT),                     // 46
++    UHFCB_PACK_FLAGS(13, UHFCB_FLAG_RP_OUT),                     // 47
++    UHFCB_PACK_FLAGS(15, UHFCB_FLAG_RP_OUT),                     // 48
++    UHFCB_PACK_FLAGS(17, 0),                                     // 49
++    UHFCB_PACK_FLAGS(19, 0),                                     // 50
++    UHFCB_PACK_FLAGS(21, 0),                                     // 51
++    UHFCB_PACK_FLAGS(23, 0),                                     // 52
++    UHFCB_PACK_FLAGS(25, 0),                                     // 53
++    UHFCB_PACK_FLAGS(27, 0),                                     // 54
++    UHFCB_PACK_FLAGS(29, 0),                                     // 55
++    UHFCB_PACK_FLAGS(31, 0),                                     // 56
++    UHFCB_PACK_FLAGS(33, 0),                                     // 57
++    UHFCB_PACK_FLAGS(35, 0),                                     // 58
++    UHFCB_PACK_FLAGS(37, 0),                                     // 59
++    UHFCB_PACK_FLAGS(39, 0),                                     // 60
++    UHFCB_PACK_FLAGS(41, UHFCB_FLAG_RESERVED),                   // 61
++    UHFCB_PACK_FLAGS(43, UHFCB_FLAG_RESERVED),                   // 62
++    UHFCB_PACK_FLAGS(45, UHFCB_FLAG_RESERVED),                   // 63
++    UHFCB_PACK_FLAGS(47, 0),                                     // 64
++    UHFCB_PACK_FLAGS(49, 0),                                     // 65
++    UHFCB_PACK_FLAGS(51, 0),                                     // 66
++    UHFCB_PACK_FLAGS(53, 0),                                     // 67
++    UHFCB_PACK_FLAGS(55, 0),                                     // 68
++    UHFCB_PACK_FLAGS(57, 0),                                     // 69
++    UHFCB_PACK_FLAGS(59, 0),                                     // 70
++    UHFCB_PACK_FLAGS(61, UHFCB_FLAG_RP_IN),                      // 71
++    UHFCB_PACK_FLAGS(63, UHFCB_FLAG_RP_IN),                      // 72
++    UHFCB_PACK_FLAGS(65, UHFCB_FLAG_RP_IN),                      // 73
++    UHFCB_PACK_FLAGS(67, UHFCB_FLAG_RP_IN),                      // 74
++    UHFCB_PACK_FLAGS(69, UHFCB_FLAG_RP_IN),                      // 75
++    UHFCB_PACK_FLAGS(71, UHFCB_FLAG_RP_IN),                      // 76
++    UHFCB_PACK_FLAGS(73, UHFCB_FLAG_RP_IN),                      // 77
++    UHFCB_PACK_FLAGS(75, UHFCB_FLAG_RP_IN),                      // 78
++    UHFCB_PACK_FLAGS(77, 0),                                     // 79
++    UHFCB_PACK_FLAGS(79, 0),                                     // 80
++};
+ 
+-#define UHFCB_MASK_NAMEID 0x7
+-#define UHFCB_MASK_TX_DISALLOW (UHF_FLAG_DATA | UHF_FLAG_RESERVED)
++static_assert((sizeof(uhfcbChanList) / sizeof(uint32_t)) == UHFCB_NUM_CHANNELS,
++              "Channel table must contain exactly 80 entries");
+ 
+ const char *uhfcbNameList[] = {NULL,    "SOS",   "CONVOY", "CALL",
+                                "HIWAY", "BCAST", "ROAD",   "*ERR*"};
+ 
+-#define UHFCB_NUM_NAMES (sizeof(uhfcbNameList) / sizeof(uhfcbNameList[0]))
+ static_assert(
+-    UHFCB_NUM_NAMES == 8,
++    (sizeof(uhfcbNameList) / sizeof(uhfcbNameList[0])) == UHFCB_NUM_NAMES,
+     "Channel name table must contain exactly 7 names (8 entries, 0=NULL)");
+ 
+-const uhfcb_chan_t uhfcbChanList[] = {
+-    {0, UHFCB_FLAG_RP_OUT},                      // 1
+-    {2, UHFCB_FLAG_RP_OUT},                      // 2
+-    {4, UHFCB_FLAG_RP_OUT},                      // 3
+-    {6, UHFCB_FLAG_RP_OUT},                      // 4
+-    {8, UHFCB_FLAG_RP_OUT | UHFCB_FLAG_SOS | 1}, // 5 ("SOS")
+-    {10, UHFCB_FLAG_RP_OUT},                     // 6
+-    {12, UHFCB_FLAG_RP_OUT},                     // 7
+-    {14, UHFCB_FLAG_RP_OUT},                     // 8
+-    {16, 0},                                     // 9
+-    {18, 2},                                     // 10 ("CONVOY")
+-    {20, 3},                                     // 11 ("CALL")
+-    {22, 0},                                     // 12
+-    {24, 0},                                     // 13
+-    {26, 0},                                     // 14
+-    {28, 0},                                     // 15
+-    {30, 0},                                     // 16
+-    {32, 0},                                     // 17
+-    {34, 0},                                     // 18
+-    {36, 0},                                     // 19
+-    {38, 0},                                     // 20
+-    {40, 0},                                     // 21
+-    {42, UHFCB_FLAG_DATA},                       // 22 (DATA1)
+-    {44, UHFCB_FLAG_DATA},                       // 23 (DATA2)
+-    {46, 0},                                     // 24
+-    {48, 0},                                     // 25
+-    {50, 0},                                     // 26
+-    {52, 0},                                     // 27
+-    {54, 0},                                     // 28
+-    {56, 4},                                     // 29 ("HIWAY")
+-    {58, 5},                                     // 30 ("BCAST")
+-    {60, UHFCB_FLAG_RP_IN},                      // 31
+-    {62, UHFCB_FLAG_RP_IN},                      // 32
+-    {64, UHFCB_FLAG_RP_IN},                      // 33
+-    {66, UHFCB_FLAG_RP_IN},                      // 34
+-    {68, UHFCB_FLAG_RP_IN | UHFCB_FLAG_SOS | 1}, // 35 (SOS)
+-    {70, UHFCB_FLAG_RP_IN},                      // 36
+-    {72, UHFCB_FLAG_RP_IN},                      // 37
+-    {74, UHFCB_FLAG_RP_IN},                      // 38
+-    {76, 0},                                     // 39
+-    {78, 6},                                     // 40 ("ROAD")
+-    {1, UHFCB_FLAG_RP_OUT},                      // 41
+-    {3, UHFCB_FLAG_RP_OUT},                      // 42
+-    {5, UHFCB_FLAG_RP_OUT},                      // 43
+-    {7, UHFCB_FLAG_RP_OUT},                      // 44
+-    {9, UHFCB_FLAG_RP_OUT},                      // 45
+-    {11, UHFCB_FLAG_RP_OUT},                     // 46
+-    {13, UHFCB_FLAG_RP_OUT},                     // 47
+-    {15, UHFCB_FLAG_RP_OUT},                     // 48
+-    {17, 0},                                     // 49
+-    {19, 0},                                     // 50
+-    {21, 0},                                     // 51
+-    {23, 0},                                     // 52
+-    {25, 0},                                     // 53
+-    {27, 0},                                     // 54
+-    {29, 0},                                     // 55
+-    {31, 0},                                     // 56
+-    {33, 0},                                     // 57
+-    {35, 0},                                     // 58
+-    {37, 0},                                     // 59
+-    {39, 0},                                     // 60
+-    {41, UHFCB_FLAG_RESERVED},                   // 61
+-    {43, UHFCB_FLAG_RESERVED},                   // 62
+-    {45, UHFCB_FLAG_RESERVED},                   // 63
+-    {47, 0},                                     // 64
+-    {49, 0},                                     // 65
+-    {51, 0},                                     // 66
+-    {53, 0},                                     // 67
+-    {55, 0},                                     // 68
+-    {57, 0},                                     // 69
+-    {59, 0},                                     // 70
+-    {61, UHFCB_FLAG_RP_IN},                      // 71
+-    {63, UHFCB_FLAG_RP_IN},                      // 72
+-    {65, UHFCB_FLAG_RP_IN},                      // 73
+-    {67, UHFCB_FLAG_RP_IN},                      // 74
+-    {69, UHFCB_FLAG_RP_IN},                      // 75
+-    {71, UHFCB_FLAG_RP_IN},                      // 76
+-    {73, UHFCB_FLAG_RP_IN},                      // 77
+-    {75, UHFCB_FLAG_RP_IN},                      // 78
+-    {77, 0},                                     // 79
+-    {79, 0},                                     // 80
+-};
+-
+-#define UHFCB_NUM_CHANNELS (sizeof(uhfcbChanList) / sizeof(uhfcbChanList[0]))
+-static_assert(UHFCB_NUM_CHANNELS == 80,
+-              "Channel table must contain exactly 80 entries");
+-
+-inline uint32_t uhfcb_freq_hz(uint8_t slot) {
+-  if (slot >= 80)
+-    slot = 0;
+-  return UHFCB_BASE_HZ + (uint32_t)slot * UHFCB_STEP_HZ;
+-}
+-
+ inline const char *uhfcb_flags_name(uint8_t flags) {
+   if (flags & UHFCB_FLAG_DATA)
+     return "DATA";
+@@ -121,3 +105,40 @@ inline const char *uhfcb_flags_name(uint8_t flags) {
+     return "RESV";
+   return uhfcbNameList[flags & UHFCB_MASK_NAMEID];
+ }
++
++VFO_Info_t uhfcb_vfoinfo(uint8_t channel, bool repeater) {
++  if (channel < 1 || channel > UHFCB_NUM_CHANNELS) {
++    channel = 1;
++  }
++  channel--; // channel to index
++  const uint32_t chan = uhfcbChanList[channel];
++
++  VFO_Info_t vfoInfo;
++  FREQ_Config_t freqInfo;
++
++  uint8_t flags = UHFCB_EXTRACT_FLAGS(chan);
++
++  freqInfo.Frequency = UHFCB_EXTRACT_FREQ(chan);
++  freqInfo.CodeType = CODE_TYPE_OFF;
++
++  vfoInfo.Band = BAND7_470MHz;
++  vfoInfo.Modulation = MODULATION_FM;
++  vfoInfo.CHANNEL_BANDWIDTH = BANDWIDTH_NARROW;
++
++  vfoInfo.freq_config_TX = freqInfo;
++  vfoInfo.freq_config_RX = freqInfo;
++  vfoInfo.pTX = &vfoInfo.freq_config_TX;
++  vfoInfo.pRX = &vfoInfo.freq_config_RX;
++  vfoInfo.FrequencyReverse = 0;
++  vfoInfo.Compander = 0;
++
++  vfoInfo.DTMF_DECODING_ENABLE = 0;
++  vfoInfo.STEP_SETTING = STEP_12_5kHz;
++  vfoInfo.TX_OFFSET_FREQUENCY = UHFCB_RP_FREQ_OFFSET;
++  vfoInfo.TX_OFFSET_FREQUENCY_DIRECTION =
++      (repeater && (flags & UHFCB_FLAG_RP_OUT))
++          ? TX_OFFSET_FREQUENCY_DIRECTION_ADD
++          : TX_OFFSET_FREQUENCY_DIRECTION_OFF;
++
++  return vfoInfo;
++}
+diff --git a/uhfcb.h b/uhfcb.h
+index a69305f..7a97bf8 100644
+--- a/uhfcb.h
++++ b/uhfcb.h
+@@ -3,22 +3,34 @@
+ 
+ #include <stdint.h>
+ 
+-typedef struct {
+-  // Frequency Slot (25kHz steps)
+-  const uint8_t freq_slot;
+-  // Channel Info (bitfield)
+-  // 0-2: Name Bits (see uhfcbNameList)
+-  // 3: Repeater Output
+-  // 4: Repeater Input
+-  // 5: SOS
+-  // 6: Data Only
+-  // 7: (Channel) Reserved
+-  const uint8_t info;
+-} uhfcb_chan_t;
+-
+-extern const uhfcb_chan_t uhfcbChanList[];
+-
+-uint32_t uhfcb_freq_hz(uint8_t slot);
++#define UHFCB_BASE_HZ 476425000
++#define UHFCB_STEP_HZ 12500
++
++#define UHFCB_FLAG_RP_OUT 0x08
++#define UHFCB_FLAG_RP_IN 0x10
++#define UHFCB_FLAG_SOS 0x20
++#define UHFCB_FLAG_DATA 0x40
++#define UHFCB_FLAG_RESERVED 0x80
++
++#define UHFCB_MASK_NAMEID 0x7
++#define UHFCB_MASK_TX_DISALLOW (UHF_FLAG_DATA | UHF_FLAG_RESERVED)
++
++#define UHFCB_NUM_CHANNELS 80
++#define UHFCB_NUM_NAMES 8
++#define UHFCB_RP_SLOT_OFFSET 60
++#define UHFCB_RP_FREQ_OFFSET (UHFCB_RP_SLOT_OFFSET * UHFCB_STEP_HZ)
++
++#define UHFCB_FREQ_MASK 0x00FFFFFF
++#define UHFCB_FREQ_MAGIC 0x1c000000
++#define UHFCB_FLAGS_MASK 0xFF000000
++#define UHFCB_PACK_FLAGS(slot, flags)                                          \
++  (((UHFCB_BASE_HZ + (UHFCB_STEP_HZ * slot)) & UHFCB_FREQ_MASK) | (flags << 24))
++#define UHFCB_EXTRACT_FREQ(packed)                                             \
++  ((packed & UHFCB_FREQ_MASK) | UHFCB_FREQ_MAGIC)
++#define UHFCB_EXTRACT_FLAGS(packed) ((packed & UHFCB_FLAGS_MASK) >> 24)
++
++extern const uint32_t uhfcbChanList[UHFCB_NUM_CHANNELS];
++
+ const char *uhfcb_flags_name(uint8_t flags);
+ 
+ #endif
+diff --git a/ui/uhfcb.c b/ui/uhfcb.c
+index bac56f1..c13817d 100644
+--- a/ui/uhfcb.c
++++ b/ui/uhfcb.c
+@@ -8,19 +8,32 @@
+ #include <uhfcb.h>
+ 
+ void UI_DisplayUhf(void) {
+-  char StatusString[10];
++  char StatusString[16];
++  char FreqString[12];
++
++  if (gUhfCurrChannel < 1 || gUhfCurrChannel > UHFCB_NUM_CHANNELS) {
++    gUhfCurrChannel = 1;
++  }
+ 
+   UI_DisplayClear();
+ 
+-  const char *name = uhfcb_flags_name(uhfcbChanList[gUhfCurrChannel - 1].info);
++  const uint32_t chan = uhfcbChanList[gUhfCurrChannel - 1];
++
++  const char *name = uhfcb_flags_name(UHFCB_EXTRACT_FLAGS(chan));
++  uint32_t freq = UHFCB_EXTRACT_FREQ(chan);
++
++  uint32_t mhz = freq / 1000000;
++  uint32_t khz = (freq % 1000000) / 1000;
+ 
+-  snprintf_(StatusString, 10, "Ch%u", gUhfCurrChannel);
+   if (name != NULL) {
+-    UI_PrintString(StatusString, 0, LCD_WIDTH, 1, 10);
+-    UI_PrintString(name, 0, LCD_WIDTH, 3, 10);
++    snprintf_(StatusString, 16, "%u: %s", gUhfCurrChannel, name);
+   } else {
+-    UI_PrintString(StatusString, 0, LCD_WIDTH, 2, 10);
++    snprintf_(StatusString, 10, "Ch%u", gUhfCurrChannel);
+   }
++  snprintf_(FreqString, 12, "%lu.%03lu MHz", mhz, khz);
++
++  UI_PrintString(StatusString, 0, LCD_WIDTH, 1, 10);
++  UI_PrintString(FreqString, 0, LCD_WIDTH, 3, 8);
+ 
+   ST7565_BlitFullScreen();
+ }

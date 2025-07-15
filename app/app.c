@@ -21,6 +21,7 @@
 #include "am_fix.h"
 #include "app/action.h"
 #include "app/uhfcb.h"
+#include "ui/uhfcb.h"
 
 #ifdef ENABLE_AIRCOPY
 #include "app/aircopy.h"
@@ -1419,6 +1420,7 @@ void APP_TimeSlice500ms(void) {
   BATTERY_TimeSlice500ms();
   SCANNER_TimeSlice500ms();
   UI_MAIN_TimeSlice500ms();
+  UI_UHF_TimeSlice500ms();
 
 #ifdef ENABLE_DTMF_CALLING
   if (gCurrentFunction != FUNCTION_TRANSMIT) {
