@@ -9,6 +9,9 @@
 #include <stdint.h>
 #include <uhfcb.h>
 
+uint8_t gUhfChanInputLength = 0;
+uint8_t gUhfChanInputValue = 0;
+
 void UHF_UpdateVfo() {
   uint32_t chan = uhfcbChanList[gEeprom.UHFCB_CHANNEL - 1];
   uint8_t flags = UHFCB_EXTRACT_FLAGS(chan);
@@ -30,20 +33,24 @@ void UHF_UpdateVfo() {
   BK4819_RX_TurnOn();
 }
 
+void UHF_SetChannel(uint8_t chan, bool userp) {
+  if (chan < 1 || chan > UHFCB_NUM_CHANNELS) {
+    gBeepToPlay = BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL;
+    return;
+  }
+
+  gEeprom.UHFCB_CHANNEL = chan;
+  gEeprom.UHFCB_USE_REPEATER = userp;
+  UHF_UpdateVfo();
+}
+
 void UHF_ProcessKey_UP_DOWN(bool bKeyPressed, bool bKeyHeld, int8_t direction) {
   (void)bKeyHeld;
   if (bKeyPressed)
     return;
 
   uint8_t newChannel = gEeprom.UHFCB_CHANNEL + direction;
-  if (newChannel < 1 || newChannel > UHFCB_NUM_CHANNELS) {
-    gBeepToPlay = BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL;
-    return;
-  }
-
-  gEeprom.UHFCB_CHANNEL = newChannel;
-  gEeprom.UHFCB_USE_REPEATER = false;
-  UHF_UpdateVfo();
+  UHF_SetChannel(newChannel, false);
   gBeepToPlay = BEEP_1KHZ_60MS_OPTIONAL;
 }
 
@@ -61,8 +68,52 @@ void UHF_ProcessKey_STAR(bool bKeyPressed) {
   }
 }
 
+void UHF_ProcessKey_DIGITS(bool bKeyPressed, bool bKeyHeld, uint8_t key) {
+  (void)bKeyHeld;
+  if (!bKeyPressed)
+    return;
+
+  ++gUhfChanInputLength;
+  gUhfChanInputValue = (gUhfChanInputValue * 10) + key;
+  gBeepToPlay = BEEP_1KHZ_60MS_OPTIONAL;
+
+  if (gUhfChanInputLength == 2) {
+    UHF_SetChannel(gUhfChanInputValue, false);
+    gUhfChanInputValue = 0;
+    gUhfChanInputLength = 0;
+  }
+}
+
+void UHF_ProcessKey_EXIT(bool bKeyPressed, bool bKeyHeld) {
+  (void)bKeyHeld;
+  if (!bKeyPressed)
+    return;
+
+  switch (gUhfChanInputLength) {
+  case 0:
+    gBeepToPlay = BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL;
+    break;
+  case 1:
+    gUhfChanInputValue = 0;
+    gUhfChanInputLength = 0;
+    gBeepToPlay = BEEP_440HZ_40MS_OPTIONAL;
+    break;
+  default:
+    gUhfChanInputValue /= 10;
+    --gUhfChanInputLength;
+    gBeepToPlay = BEEP_440HZ_40MS_OPTIONAL;
+    break;
+  }
+}
+
 void UHF_ProcessKeys(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld) {
   switch (Key) {
+  case KEY_0 ... KEY_9:
+    UHF_ProcessKey_DIGITS(bKeyPressed, bKeyHeld, Key - KEY_0);
+    break;
+  case KEY_EXIT:
+    UHF_ProcessKey_EXIT(bKeyPressed, bKeyHeld);
+    break;
   case KEY_UP:
     UHF_ProcessKey_UP_DOWN(bKeyPressed, bKeyHeld, 1);
     break;

@@ -5,6 +5,7 @@
 #include "misc.h"
 #include "settings.h"
 #include "ui/helper.h"
+#include "ui/inputbox.h"
 #include "ui/ui.h"
 #include <stdint.h>
 #include <string.h>
